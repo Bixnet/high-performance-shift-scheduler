@@ -1,5 +1,8 @@
 # High-Performance Shift Scheduler in Rust
 
+[![CI](https://github.com/Bixnet/high-performance-shift-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/Bixnet/high-performance-shift-scheduler/actions/workflows/ci.yml)
+![Rust](https://img.shields.io/badge/Rust-stable-B7410E)
+
 A performance-oriented command-line shift scheduler built around tabu search.
 
 ## Highlights
