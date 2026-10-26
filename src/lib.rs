@@ -40,15 +40,17 @@ impl Problem {
         let base_target = (target_total / staff_count.max(1)) as i32;
         let remainder = (target_total % staff_count.max(1)) as i32;
 
-        let staff = (0..staff_count).map(|id| {
-            let target = base_target + i32::from(id < remainder as usize);
-            let unavailable_days = (0..days).map(|_| rng.gen_bool(0.08)).collect();
-            Staff {
-                target_assignments: target,
-                max_nights: (target / 3).max(1),
-                unavailable_days,
-            }
-        }).collect();
+        let staff = (0..staff_count)
+            .map(|id| {
+                let target = base_target + i32::from(id < remainder as usize);
+                let unavailable_days = (0..days).map(|_| rng.gen_bool(0.08)).collect();
+                Staff {
+                    target_assignments: target,
+                    max_nights: (target / 3).max(1),
+                    unavailable_days,
+                }
+            })
+            .collect();
 
         let slots = (0..days)
             .flat_map(|day| (0..3).map(move |shift| ShiftSlot { day, shift }))
@@ -65,7 +67,9 @@ pub struct Schedule {
 
 impl Schedule {
     pub fn new(problem: &Problem) -> Self {
-        Self { assignment: vec![UNASSIGNED; problem.slots.len()] }
+        Self {
+            assignment: vec![UNASSIGNED; problem.slots.len()],
+        }
     }
 }
 
@@ -98,7 +102,13 @@ impl ScoreState {
         state
     }
 
-    fn staff_score(problem: &Problem, staff_id: usize, assignments: i32, nights: i32, unavailable: i32) -> i64 {
+    fn staff_score(
+        problem: &Problem,
+        staff_id: usize,
+        assignments: i32,
+        nights: i32,
+        unavailable: i32,
+    ) -> i64 {
         let staff = &problem.staff[staff_id];
         let diff = assignments - staff.target_assignments;
         let load_penalty = i64::from(diff * diff) * 2;
@@ -108,7 +118,13 @@ impl ScoreState {
         load_penalty + night_penalty + availability_penalty
     }
 
-    fn apply_assignment(&mut self, problem: &Problem, slot_idx: usize, staff_id: usize, direction: i32) {
+    fn apply_assignment(
+        &mut self,
+        problem: &Problem,
+        slot_idx: usize,
+        staff_id: usize,
+        direction: i32,
+    ) {
         let old_score = self.staff_scores[staff_id];
         self.assignment_counts[staff_id] += direction;
         if problem.slots[slot_idx].shift == 2 {
@@ -149,7 +165,10 @@ pub struct TabuList {
 
 impl TabuList {
     pub fn new(capacity: usize) -> Self {
-        Self { entries: VecDeque::with_capacity(capacity), capacity: capacity.max(1) }
+        Self {
+            entries: VecDeque::with_capacity(capacity),
+            capacity: capacity.max(1),
+        }
     }
 
     pub fn push(&mut self, mv: Move) {
@@ -170,7 +189,12 @@ pub struct SolverConfig {
 
 impl Default for SolverConfig {
     fn default() -> Self {
-        Self { iterations: 500, candidates_per_slot: 8, tabu_capacity: 256, seed: 42 }
+        Self {
+            iterations: 500,
+            candidates_per_slot: 8,
+            tabu_capacity: 256,
+            seed: 42,
+        }
     }
 }
 
@@ -205,7 +229,8 @@ impl Solver {
             }
 
             let tabu_snapshot = tabu.entries.iter().copied().collect::<Vec<_>>();
-            let evaluated = candidate_moves.par_iter()
+            let evaluated = candidate_moves
+                .par_iter()
                 .map(|&mv| {
                     let candidate_score = delta_score(problem, &state, mv);
                     let is_tabu = tabu_snapshot.iter().any(|x| x == &mv);
@@ -219,7 +244,11 @@ impl Solver {
                 continue;
             };
 
-            tabu.push(Move { slot: chosen.slot, from: chosen.to, to: chosen.from });
+            tabu.push(Move {
+                slot: chosen.slot,
+                from: chosen.to,
+                to: chosen.from,
+            });
             state.apply_move(problem, &mut schedule, chosen);
 
             if state.total < best_score {
@@ -228,16 +257,28 @@ impl Solver {
             }
 
             if best_score == 0 {
-                return SolveResult { schedule: best_schedule, score: best_score, iterations: iteration + 1 };
+                return SolveResult {
+                    schedule: best_schedule,
+                    score: best_score,
+                    iterations: iteration + 1,
+                };
             }
         }
 
-        SolveResult { schedule: best_schedule, score: best_score, iterations: self.config.iterations }
+        SolveResult {
+            schedule: best_schedule,
+            score: best_score,
+            iterations: self.config.iterations,
+        }
     }
 
     fn initial_schedule(&self, problem: &Problem, rng: &mut StdRng) -> Schedule {
         let mut schedule = Schedule::new(problem);
-        let mut remaining = problem.staff.iter().map(|s| s.target_assignments).collect::<Vec<_>>();
+        let mut remaining = problem
+            .staff
+            .iter()
+            .map(|s| s.target_assignments)
+            .collect::<Vec<_>>();
         let mut slot_indices = (0..problem.slots.len()).collect::<Vec<_>>();
 
         for i in (1..slot_indices.len()).rev() {
@@ -253,7 +294,9 @@ impl Solver {
                 .collect::<Vec<_>>();
 
             if candidates.is_empty() {
-                candidates = (0..problem.staff.len()).filter(|&id| remaining[id] > 0).collect();
+                candidates = (0..problem.staff.len())
+                    .filter(|&id| remaining[id] > 0)
+                    .collect();
             }
             if candidates.is_empty() {
                 candidates = (0..problem.staff.len()).collect();
@@ -267,8 +310,14 @@ impl Solver {
         schedule
     }
 
-    fn generate_candidates(&self, problem: &Problem, schedule: &Schedule, rng: &mut StdRng) -> Vec<Move> {
-        let mut moves = Vec::with_capacity(schedule.assignment.len() * self.config.candidates_per_slot);
+    fn generate_candidates(
+        &self,
+        problem: &Problem,
+        schedule: &Schedule,
+        rng: &mut StdRng,
+    ) -> Vec<Move> {
+        let mut moves =
+            Vec::with_capacity(schedule.assignment.len() * self.config.candidates_per_slot);
         let staff_count = problem.staff.len();
         if staff_count == 0 {
             return moves;
@@ -326,7 +375,11 @@ mod tests {
         let solver = Solver::new(SolverConfig::default());
         let mut schedule = solver.initial_schedule(&problem, &mut StdRng::seed_from_u64(2));
         let mut state = ScoreState::from_schedule(&problem, &schedule);
-        let mv = Move { slot: 0, from: schedule.assignment[0], to: 3 };
+        let mv = Move {
+            slot: 0,
+            from: schedule.assignment[0],
+            to: 3,
+        };
         state.apply_move(&problem, &mut schedule, mv);
         assert_eq!(state.total, state.recompute_total());
     }
@@ -334,7 +387,11 @@ mod tests {
     #[test]
     fn solver_returns_consistent_score() {
         let problem = Problem::synthetic(50, 14, 1);
-        let solver = Solver::new(SolverConfig { iterations: 25, candidates_per_slot: 4, ..Default::default() });
+        let solver = Solver::new(SolverConfig {
+            iterations: 25,
+            candidates_per_slot: 4,
+            ..Default::default()
+        });
         let result = solver.solve(&problem);
         let state = ScoreState::from_schedule(&problem, &result.schedule);
         assert_eq!(result.score, state.total);
@@ -344,7 +401,11 @@ mod tests {
     fn tabu_is_bounded() {
         let mut tabu = TabuList::new(4);
         for i in 0..20 {
-            tabu.push(Move { slot: i, from: 0, to: 1 });
+            tabu.push(Move {
+                slot: i,
+                from: 0,
+                to: 1,
+            });
         }
         assert_eq!(tabu.entries.len(), 4);
     }
